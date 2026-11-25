@@ -1,8 +1,23 @@
 import { createReadStream, createWriteStream } from "fs";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
+import path from "path";
 import { HoosatRequest, HoosatRequestHandler, HoosatResponse } from "./types";
 import { DEBUG } from "./errors";
 import { compressFiles } from "./compress";
+
+/**
+ * Makes a client provided file name safe to use as a file name on disk.
+ * Strips any directory parts (both "/" and "\" separators) and unsafe characters,
+ * so the file can never be written outside of the upload directory.
+ *
+ * @param {string | null | undefined} originalFilename - The file name sent by the client.
+ * @returns {string} A safe file name.
+ */
+export const safeFilename = (originalFilename: string | null | undefined): string => {
+  const baseName = path.posix.basename((originalFilename || "").replace(/\\/g, "/"));
+  const cleaned = baseName.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/^\.+/, "");
+  return cleaned.slice(-200) || "file";
+};
 
 /**
  * middleware that handles file uploads and automatically compresses uploaded files.
@@ -25,13 +40,14 @@ export const upload = (uploadLocation: string, _maxFileSize: number = 10 * 1024 
           for (const file of files) {
             // Check if the file is successfully uploaded
             if (file.size > 0 && file.filepath) {
-              const filePath = `${uploadLocation}/${uuidv4()}-${file.originalFilename}`;
+              const newFilename = `${randomUUID()}-${safeFilename(file.originalFilename)}`;
+              const filePath = path.join(uploadLocation, newFilename);
               const writeStream = createWriteStream(filePath);
               // Pipe the file stream (writeStream) to the write stream to save the file
               const readStream = createReadStream(file.filepath);
               readStream.pipe(writeStream);
               file.filepath = filePath;
-              file.newFilename = `${uuidv4()}-${file.originalFilename}`;
+              file.newFilename = newFilename;
               // Log the file path
               DEBUG.log(`File saved: ${file.filepath}`);
               compressFiles(uploadLocation, "br");

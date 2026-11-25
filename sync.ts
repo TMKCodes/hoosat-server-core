@@ -4,7 +4,7 @@ import WebSocket, { WebSocketServer } from 'ws';
 export const createSyncSocket = (options?: WebSocket.ServerOptions<typeof WebSocket, typeof IncomingMessage>, httpsServer?: any) => {
   
   const clientsMap: Map<string, WebSocket[]> = new Map();
-  let wss: WebSocket.Server<typeof WebSocket, typeof IncomingMessage>;
+  let wss: WebSocketServer;
   if(httpsServer !== undefined) {
     wss = new WebSocketServer({ ...options, server: httpsServer });
   } else {
@@ -13,7 +13,7 @@ export const createSyncSocket = (options?: WebSocket.ServerOptions<typeof WebSoc
 
   wss.on('connection', (ws: WebSocket) => {
     console.log("WS connection initiated.")
-    ws.on('message', (message: string) => {
+    ws.on('message', (message: WebSocket.RawData) => {
       const msg = message.toString();
       if(msg.toString().startsWith("register")) {
         const identifier = msg.split("register: ")[1];

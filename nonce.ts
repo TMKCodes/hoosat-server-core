@@ -15,7 +15,7 @@ export const writeNonceToFile = (): void => {
     fs.writeFileSync(filePath, nonceBuffer);
     console.log(`Nonce successfully written to file: ${filePath}`);
   } catch (err) {
-    console.error(`Error writing nonce to file ${filePath}: ${err.message}`);
+    console.error(`Error writing nonce to file ${filePath}: ${(err as Error).message}`);
     throw err;
   }
 }
@@ -26,7 +26,7 @@ export const readNonceFromFile = (): string => {
     const data = fs.readFileSync(filePath, 'utf-8');
     return data.trim(); // Trim to remove extra whitespace, if any
   } catch (err) {
-    console.error(`Error reading nonce from file ${filePath}: ${err.message}`);
+    console.error(`Error reading nonce from file ${filePath}: ${(err as Error).message}`);
     throw err;
   }
 }

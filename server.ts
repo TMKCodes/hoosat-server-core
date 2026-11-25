@@ -156,25 +156,25 @@ export const createRouter = (): HoosatRouter => {
  * @returns A sanitized URL path.
  */
 export function sanitizeUrlPath(urlPath: string): string {
-  // Normalize the path to resolve any relative paths like ../ or ./ 
-  let sanitizedPath = path.normalize(urlPath);
+  // Keep the query string out of the path sanitization, so it is not merged into the path.
+  const queryIndex = urlPath.indexOf('?');
+  const pathname = queryIndex === -1 ? urlPath : urlPath.slice(0, queryIndex);
+  const search = queryIndex === -1 ? '' : urlPath.slice(queryIndex);
+
+  // Normalize the path to resolve any relative paths like ../ or ./
+  // URL paths always use "/", so POSIX rules are used on every OS
+  // (path.normalize would turn "/" into "\" on Windows and the filter below would strip them).
+  let sanitizedPath = path.posix.normalize(pathname);
 
   // Strip any unwanted characters (e.g., URL encoding for special characters like %, &, etc.)
   sanitizedPath = sanitizedPath.replace(/[^a-zA-Z0-9-_\/\.]/g, '');
-  
+
   // Ensure the path doesn't traverse outside of a safe directory (e.g., root directory)
   if (sanitizedPath.includes('..')) {
     throw new Error('Invalid path: contains traversal sequences');
   }
 
-  // Remove leading slashes, if necessary, to avoid unintended file access
-  //sanitizedPath = sanitizedPath.replace(/^\/+/, '');
-
-  // Optionally, ensure the sanitized path doesn't start with any dangerous sequences
-  // e.g., we don't want paths like '/..' to resolve to system files.
-  sanitizedPath = path.join('', sanitizedPath);
-
-  return sanitizedPath;
+  return sanitizedPath + search;
 }
 
 /**
@@ -246,15 +246,15 @@ export const handleRequest = async (router: HoosatRouter, req: IncomingMessage, 
     const request = await parseIncomingMessage(req);
     const nonce = readNonceFromFile();
     const cspHeader = "script-src 'self' 'nonce-" + nonce + "' http: https:; " +
-                      "style-src 'self' 'unsafe-inline';"
-                      "object-src 'none';" +
-                      "base-uri 'none'; " + 
-                      "require-trusted-types-for 'script'; " +
-                      "report-uri https://reporting.hoosat.fi;";
+                      "style-src 'self' 'unsafe-inline'; " +
+                      "object-src 'none'; " +
+                      "base-uri 'none';";
     res.setHeader("Content-Security-Policy", cspHeader);
-  
+
     const { routes } = router;
-    const { url: path = '', method = '' } = request;
+    const { url = '', method = '' } = request;
+    // Routes are matched against the path only, without the query string.
+    const path = url.split('?')[0];
   
     const middlewares: HoosatRequestHandler[] = [];
     for (const route of routes) {

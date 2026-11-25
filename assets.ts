@@ -21,17 +21,23 @@ export const assets = (publicPath: string): HoosatRequestHandler => {
   return (req: HoosatRequest, res: HoosatResponse, next?: HoosatRequestHandler): void => {
     let decodedURL: string;
     try {
-      decodedURL = decodeURIComponent(sanitizeUrlPath(req.url!) || '');
+      decodedURL = decodeURIComponent(sanitizeUrlPath(req.url!).split('?')[0] || '');
       if (decodedURL.startsWith('/public')) {
         decodedURL = decodedURL.slice('/public'.length);
       }
     } catch (error) {
       console.error('Malformed URI:', error);
+      res.status(400).send("Bad Request");
       return;
     }
     let acceptEncoding = req.headers['accept-encoding'] as string;
 
-    const filePath = path.join(publicPath, decodedURL);
+    const publicRoot = path.resolve(publicPath);
+    const filePath = path.resolve(publicRoot, `.${path.posix.sep}${decodedURL}`);
+    // Never serve anything outside of the public directory.
+    if (filePath !== publicRoot && !filePath.startsWith(publicRoot + path.sep)) {
+      return next && next(req, res);
+    }
     // Check if filePath is a file
     if (!fs.existsSync(filePath) || !fs.lstatSync(filePath).isFile()) {
       return next && next(req, res);
